@@ -11,6 +11,8 @@ import streamlit as st
 st.set_page_config(page_title="Flight Delay Risk Checker", page_icon="✈️", layout="wide")
 
 DATA = Path(__file__).parent / "data"
+if not DATA.exists():
+    DATA = Path(__file__).parent
 TABLES = ["routes", "route_hours", "airlines", "airports", "climate",
           "airport_map", "hour_month", "weather_impact", "monthly_trend"]
 
