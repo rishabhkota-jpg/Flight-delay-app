@@ -1,0 +1,9 @@
+{
+  "flights": 10269974,
+  "start": "Mar 2024",
+  "end": "Jul 2025",
+  "baseline_rate": 0.20531347012173545,
+  "train_rows": 2000000,
+  "auc": 0.7135303736983496,
+  "min_route_flights": 100
+}
