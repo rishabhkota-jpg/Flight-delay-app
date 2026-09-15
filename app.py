@@ -10,6 +10,176 @@ import streamlit as st
 
 st.set_page_config(page_title="Flight Delay Risk Checker", page_icon="✈️", layout="wide")
 
+# ---------- look and feel ----------
+
+ACCENT = "#e5484d"
+MUTED = "#7cc4fa"
+GOOD = "#30a46c"
+WARN = "#e5a000"
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] { font-family: 'Inter', -apple-system, sans-serif; }
+
+.main .block-container {
+    padding-top: 2.2rem;
+    max-width: 1280px;
+    animation: pageIn .55s cubic-bezier(.22,1,.36,1);
+}
+@keyframes pageIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* hero */
+.hero {
+    border-radius: 18px;
+    padding: 30px 34px;
+    margin-bottom: 26px;
+    background:
+        radial-gradient(900px 300px at 8% -10%, rgba(124,196,250,.20), transparent 60%),
+        radial-gradient(700px 300px at 95% 0%, rgba(229,72,77,.16), transparent 60%),
+        rgba(255,255,255,.035);
+    border: 1px solid rgba(255,255,255,.09);
+    animation: pageIn .7s cubic-bezier(.22,1,.36,1);
+}
+.hero h1 {
+    margin: 0 0 .45rem 0;
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -.035em;
+    line-height: 1.1;
+}
+.hero .plane { display: inline-block; animation: fly 4.5s ease-in-out infinite; }
+@keyframes fly {
+    0%,100% { transform: translate(0,0) rotate(0deg); }
+    50%     { transform: translate(9px,-6px) rotate(6deg); }
+}
+.hero p { margin: 0; opacity: .82; font-size: 1.02rem; line-height: 1.6; max-width: 900px; }
+.hero b { font-weight: 700; opacity: 1; }
+
+/* metric cards */
+[data-testid="stMetric"] {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 14px;
+    padding: 16px 18px;
+    transition: transform .22s cubic-bezier(.22,1,.36,1), border-color .22s, background .22s;
+}
+[data-testid="stMetric"]:hover {
+    transform: translateY(-4px);
+    border-color: rgba(124,196,250,.5);
+    background: rgba(255,255,255,.06);
+}
+[data-testid="stMetricValue"] { font-weight: 700; letter-spacing: -.02em; }
+
+/* section headings */
+h2, h3 {
+    letter-spacing: -.02em;
+    font-weight: 700;
+    padding-bottom: .35rem;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+/* tabs */
+.stTabs [data-baseweb="tab-list"] { gap: 6px; }
+.stTabs [data-baseweb="tab"] {
+    font-weight: 600;
+    border-radius: 10px 10px 0 0;
+    padding: 10px 20px;
+    transition: background .2s, color .2s;
+}
+.stTabs [data-baseweb="tab"]:hover { background: rgba(255,255,255,.05); }
+
+/* inputs */
+div[data-baseweb="select"] > div, .stDateInput input {
+    border-radius: 10px !important;
+    transition: border-color .2s, box-shadow .2s;
+}
+div[data-baseweb="select"] > div:hover { border-color: rgba(124,196,250,.6) !important; }
+
+/* risk bar */
+.risk-wrap {
+    border: 1px solid rgba(255,255,255,.09);
+    background: rgba(255,255,255,.035);
+    border-radius: 16px;
+    padding: 20px 24px 16px 24px;
+    margin: 6px 0 18px 0;
+    animation: pageIn .5s cubic-bezier(.22,1,.36,1);
+}
+.risk-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 12px;
+}
+.risk-head .label { font-size: .95rem; opacity: .75; font-weight: 500; }
+.risk-num {
+    font-size: 2.6rem; font-weight: 800; letter-spacing: -.04em;
+    animation: popIn .5s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes popIn {
+    from { opacity: 0; transform: scale(.82); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.risk-track {
+    position: relative; height: 12px; border-radius: 99px;
+    background: rgba(255,255,255,.08); overflow: hidden;
+}
+.risk-fill {
+    height: 100%; border-radius: 99px;
+    animation: grow 1s cubic-bezier(.22,1,.36,1);
+    box-shadow: 0 0 18px currentColor;
+}
+@keyframes grow { from { width: 0 !important; } }
+.risk-mark {
+    position: absolute; top: -4px; width: 2px; height: 20px;
+    background: rgba(255,255,255,.55);
+}
+.risk-scale {
+    display: flex; justify-content: space-between;
+    font-size: .74rem; opacity: .55; margin-top: 8px;
+}
+
+/* callout */
+.callout {
+    border-radius: 14px; padding: 16px 20px; margin: 4px 0 6px 0;
+    border-left: 4px solid; line-height: 1.65; font-size: .97rem;
+    animation: pageIn .5s cubic-bezier(.22,1,.36,1);
+}
+
+/* dataframe + map corners */
+[data-testid="stDataFrame"], [data-testid="stDeckGlJsonChart"] {
+    border-radius: 12px; overflow: hidden;
+}
+
+/* expander */
+.streamlit-expanderHeader, [data-testid="stExpander"] summary {
+    font-weight: 600; border-radius: 10px;
+}
+
+#MainMenu, footer, header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+
+def style(chart):
+    """Consistent chart styling."""
+    return (
+        chart.configure_view(strokeWidth=0)
+        .configure_axis(
+            labelColor="#9fb0c0", titleColor="#9fb0c0",
+            domainColor="rgba(255,255,255,.15)", tickColor="rgba(255,255,255,.15)",
+            grid=False, labelFont="Inter", titleFont="Inter",
+            labelFontSize=12, titleFontSize=12, titleFontWeight=500,
+        )
+        .configure_legend(
+            labelColor="#c6d2de", titleColor="#c6d2de",
+            labelFont="Inter", titleFont="Inter", labelFontSize=12,
+        )
+    )
+
+
 DATA = Path(__file__).parent / "data"
 if not DATA.exists():
     DATA = Path(__file__).parent
@@ -68,6 +238,9 @@ def risk_level(p):
     if p > NATIONAL * 1.25:
         return "High"
     return "Moderate"
+
+
+RISK_COLOR = {"Low": GOOD, "Moderate": WARN, "High": ACCENT}
 
 
 WEATHER_OPTIONS = [
@@ -129,13 +302,16 @@ default_origin = "CLT" if "CLT" in origin_list else origins.sort_values("flights
 
 # ---------- header ----------
 
-st.title("✈️ Flight Delay Risk Checker")
-st.write(
-    f"Check the chance your flight leaves **15 or more minutes late**, or explore what drives delays. "
-    f"Estimates come from a model trained on **{STATS['flights']:,}** U.S. flights "
-    f"({STATS['start']} to {STATS['end']}) combined with hourly weather at each departure airport."
-)
-
+st.markdown(f"""
+<div class="hero">
+  <h1><span class="plane">✈️</span> Flight Delay Risk Checker</h1>
+  <p>
+    Check the chance your flight leaves <b>15 or more minutes late</b>, or explore what drives delays.
+    Estimates come from a model trained on <b>{STATS['flights']:,}</b> U.S. flights
+    ({STATS['start']} to {STATS['end']}) combined with hourly weather at each departure airport.
+  </p>
+</div>
+""", unsafe_allow_html=True)
 
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -165,12 +341,12 @@ def render_insights():
     )
     labels = {"pct_delayed": "Actual delay rate", "adjusted_pct_delayed": "Adjusted for airport, time, and weather"}
     long["measure"] = long["measure"].map(labels)
-    chart = alt.Chart(long).mark_bar().encode(
+    chart = alt.Chart(long).mark_bar(cornerRadiusEnd=3).encode(
         y=alt.Y("airline:N", sort=order, title=None),
         yOffset=alt.YOffset("measure:N", sort=list(labels.values())),
         x=alt.X("rate:Q", title="Share of flights 15+ minutes late", axis=alt.Axis(format="%", tickCount=6)),
         color=alt.Color("measure:N", sort=list(labels.values()),
-                        scale=alt.Scale(range=["#9ecae1", "#d62728"]),
+                        scale=alt.Scale(range=[MUTED, ACCENT]),
                         legend=alt.Legend(title=None, orient="top", labelLimit=400)),
         tooltip=[
             alt.Tooltip("airline:N", title="Airline"),
@@ -179,7 +355,7 @@ def render_insights():
             alt.Tooltip("flights:Q", title="Flights", format=","),
         ],
     ).properties(height=max(300, 38 * len(lb)))
-    st.altair_chart(chart, width="stretch")
+    st.altair_chart(style(chart), width="stretch")
     st.caption(
         "The adjusted rate gives every airline the exact same set of flights (same airports, hours, months, "
         "and weather). Airlines that stay near the top after adjusting are not just unlucky with where and when they fly."
@@ -213,7 +389,7 @@ def render_insights():
     hm = q("SELECT * FROM hour_month")
     hm["hour_label"] = hm["dep_hour"].map(hour_label)
     hm["month_name"] = hm["month"].map(lambda m: MONTHS[int(m) - 1])
-    heat = alt.Chart(hm).mark_rect().encode(
+    heat = alt.Chart(hm).mark_rect(cornerRadius=2).encode(
         x=alt.X("hour_label:N", sort=[hour_label(h) for h in range(5, 24)], title="Scheduled departure"),
         y=alt.Y("month_name:N", sort=MONTHS, title=None),
         color=alt.Color("pct_delayed:Q", scale=alt.Scale(scheme="orangered"),
@@ -225,7 +401,7 @@ def render_insights():
             alt.Tooltip("flights:Q", title="Flights", format=","),
         ],
     ).properties(height=360)
-    st.altair_chart(heat, width="stretch")
+    st.altair_chart(style(heat), width="stretch")
     st.caption("Delays pile up as the day goes on and peak in summer, when thunderstorms and full schedules hit at the same time.")
 
     # Weather impact + monthly trend
@@ -238,7 +414,7 @@ def render_insights():
         if pick != "All airlines":
             wi = wi[wi["airline"] == pick]
         wi = weighted(wi, ["condition", "condition_order"]).sort_values("condition_order")
-        wchart = alt.Chart(wi).mark_bar(color="#3182bd").encode(
+        wchart = alt.Chart(wi).mark_bar(color=MUTED, cornerRadiusEnd=4).encode(
             x=alt.X("condition:N", sort=wi["condition"].tolist(), title=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("pct_delayed:Q", title="Delay rate", axis=alt.Axis(format="%")),
             tooltip=[
@@ -247,7 +423,7 @@ def render_insights():
                 alt.Tooltip("flights:Q", title="Flights", format=","),
             ],
         ).properties(height=320)
-        st.altair_chart(wchart, width="stretch")
+        st.altair_chart(style(wchart), width="stretch")
 
     with mcol2:
         st.subheader("Delay rate over time")
@@ -257,7 +433,7 @@ def render_insights():
         overall = weighted(mt, ["month_start"]).assign(airline="All airlines")
         sel = weighted(mt[mt["airline"].isin(chosen)], ["month_start", "airline"])
         both = pd.concat([overall, sel], ignore_index=True)
-        tchart = alt.Chart(both).mark_line(point=True).encode(
+        tchart = alt.Chart(both).mark_line(point=True, strokeWidth=2.5).encode(
             x=alt.X("month_start:T", title=None),
             y=alt.Y("pct_delayed:Q", title="Delay rate", axis=alt.Axis(format="%")),
             color=alt.Color("airline:N", legend=alt.Legend(title=None, orient="bottom", columns=2, labelLimit=250)),
@@ -268,7 +444,7 @@ def render_insights():
                 alt.Tooltip("pct_delayed:Q", title="Delay rate", format=".1%"),
             ],
         ).properties(height=320)
-        st.altair_chart(tchart, width="stretch")
+        st.altair_chart(style(tchart), width="stretch")
 
 
 def render_checker():
@@ -323,7 +499,6 @@ def render_checker():
         clim = {"temp_c": 15.0, "precip_mm": 0.0, "snow_cm": 0.0, "gust_kmh": 25.0, "cloud_pct": 50.0}
     wx = weather_values(weather_choice, clim)
 
-
     def build_rows(**overrides):
         base = {
             "airline": airline, "origin": origin, "dest": dest,
@@ -332,17 +507,37 @@ def render_checker():
         base.update(overrides)
         return base
 
-
     # ---------- main prediction ----------
 
-    p = float(predict(pd.DataFrame([build_rows()]))[0])
+    with st.spinner("Scoring this flight..."):
+        p = float(predict(pd.DataFrame([build_rows()]))[0])
     level = risk_level(p)
+    color = RISK_COLOR[level]
 
     route_stats = q("""
         SELECT * FROM routes WHERE origin = ? AND dest = ? AND airline = ?
     """, [origin, dest, airline]).iloc[0]
 
     st.divider()
+
+    # animated risk bar (scale tops out at 50%)
+    fill = min(p / 0.5, 1.0) * 100
+    mark = min(NATIONAL / 0.5, 1.0) * 100
+    st.markdown(f"""
+    <div class="risk-wrap">
+      <div class="risk-head">
+        <span class="label">Chance of leaving 15+ minutes late &mdash; <b>{level.lower()} risk</b></span>
+        <span class="risk-num" style="color:{color}">{p:.0%}</span>
+      </div>
+      <div class="risk-track">
+        <div class="risk-fill" style="width:{fill:.1f}%; background:{color}; color:{color}"></div>
+        <div class="risk-mark" style="left:{mark:.1f}%"></div>
+      </div>
+      <div class="risk-scale">
+        <span>0%</span><span>national average {NATIONAL:.0%}</span><span>50%+</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     m1, m2, m3 = st.columns(3)
     m1.metric(
@@ -370,12 +565,13 @@ def render_checker():
         "Snow": "snow",
         "Very windy": "strong winds",
     }
-    msg = (
-        f"**{level} risk.** Flying {airline} from {origin} to {dest} at {hour_label(hour)} "
-        f"on a {weekday} in {travel_date.strftime('%B')}, with {WEATHER_PHRASE[weather_choice]}, "
-        f"there is about a **{p:.0%}** chance of leaving 15+ minutes late. The national average is {NATIONAL:.0%}."
-    )
-    {"Low": st.success, "Moderate": st.warning, "High": st.error}[level](msg)
+    st.markdown(f"""
+    <div class="callout" style="border-color:{color}; background:{color}14">
+      <b>{level} risk.</b> Flying {airline} from {origin} to {dest} at {hour_label(hour)}
+      on a {weekday} in {travel_date.strftime('%B')}, with {WEATHER_PHRASE[weather_choice]},
+      there is about a <b>{p:.0%}</b> chance of leaving 15+ minutes late. The national average is {NATIONAL:.0%}.
+    </div>
+    """, unsafe_allow_html=True)
 
     # ---------- chart 1: best time of day ----------
 
@@ -391,17 +587,17 @@ def render_checker():
         flown = set(hours_flown.loc[hours_flown["flights"] >= 10, "dep_hour"].astype(int))
         hour_df["scheduled"] = np.where(hour_df["dep_hour"].isin(flown), "Yes", "No")
 
-        chart = alt.Chart(hour_df).mark_bar().encode(
+        chart = alt.Chart(hour_df).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
             x=alt.X("label:N", sort=hour_df["label"].tolist(), title="Scheduled departure"),
             y=alt.Y("risk:Q", title="Chance of delay", axis=alt.Axis(format="%")),
-            color=alt.Color("selected:N", scale=alt.Scale(domain=["Your flight", "Other times"], range=["#d62728", "#9ecae1"]), legend=None),
+            color=alt.Color("selected:N", scale=alt.Scale(domain=["Your flight", "Other times"], range=[ACCENT, MUTED]), legend=None),
             tooltip=[
                 alt.Tooltip("label:N", title="Departure"),
                 alt.Tooltip("risk:Q", title="Chance of delay", format=".0%"),
                 alt.Tooltip("scheduled:N", title=f"{airline} usually flies then"),
             ],
         ).properties(height=320)
-        st.altair_chart(chart, width="stretch")
+        st.altair_chart(style(chart), width="stretch")
 
         pool = hour_df[hour_df["dep_hour"].isin(flown)] if flown else hour_df
         best = pool.sort_values("risk").iloc[0]
@@ -423,10 +619,10 @@ def render_checker():
         comp["selected"] = np.where(comp["airline"] == airline, "Your airline", "Other airlines")
         comp = comp.sort_values("risk")
 
-        chart2 = alt.Chart(comp).mark_bar().encode(
+        chart2 = alt.Chart(comp).mark_bar(cornerRadiusEnd=4).encode(
             y=alt.Y("airline:N", sort=comp["airline"].tolist(), title=None),
             x=alt.X("risk:Q", title="Chance of delay", axis=alt.Axis(format="%")),
-            color=alt.Color("selected:N", scale=alt.Scale(domain=["Your airline", "Other airlines"], range=["#d62728", "#9ecae1"]), legend=None),
+            color=alt.Color("selected:N", scale=alt.Scale(domain=["Your airline", "Other airlines"], range=[ACCENT, MUTED]), legend=None),
             tooltip=[
                 alt.Tooltip("airline:N", title="Airline"),
                 alt.Tooltip("risk:Q", title="Estimated chance of delay", format=".0%"),
@@ -434,7 +630,7 @@ def render_checker():
                 alt.Tooltip("flights:Q", title="Past flights", format=","),
             ],
         ).properties(height=max(160, 45 * len(comp)))
-        st.altair_chart(chart2, width="stretch")
+        st.altair_chart(style(chart2), width="stretch")
 
         if len(comp) > 1:
             st.caption(f"Same time, date, and weather for every airline. Lowest risk here: **{comp.iloc[0]['airline']}**.")
