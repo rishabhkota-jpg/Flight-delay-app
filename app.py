@@ -1,4 +1,5 @@
 import json
+import requests
 import datetime as dt
 from pathlib import Path
 
@@ -205,6 +206,31 @@ def q(sql, params=None):
 
 @st.cache_resource
 def load_json(name):
+    @st.cache_data(ttl=3600)
+def forecast_weather(lat, lon, date_str, hour):
+    """Open-Meteo forecast for a specific airport, date and hour. None if unavailable."""
+    try:
+        r = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat, "longitude": lon,
+                "hourly": "temperature_2m,precipitation,snowfall,wind_gusts_10m,cloud_cover",
+                "start_date": date_str, "end_date": date_str,
+                "timezone": "auto",
+            },
+            timeout=6,
+        )
+        r.raise_for_status()
+        h = r.json()["hourly"]
+        return {
+            "temp_c": float(h["temperature_2m"][hour]),
+            "precip_mm": float(h["precipitation"][hour]),
+            "snow_cm": float(h["snowfall"][hour]),
+            "gust_kmh": float(h["wind_gusts_10m"][hour]),
+            "cloud_pct": float(h["cloud_cover"][hour]),
+        }
+    except Exception:
+        return None
     return json.loads((DATA / name).read_text())
 
 
