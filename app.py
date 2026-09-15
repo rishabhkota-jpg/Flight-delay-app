@@ -206,7 +206,10 @@ def q(sql, params=None):
 
 @st.cache_resource
 def load_json(name):
-    @st.cache_data(ttl=3600)
+    return json.loads((DATA / name).read_text())
+
+
+@st.cache_data(ttl=3600)
 def forecast_weather(lat, lon, date_str, hour):
     """Open-Meteo forecast for a specific airport, date and hour. None if unavailable."""
     try:
@@ -231,7 +234,6 @@ def forecast_weather(lat, lon, date_str, hour):
         }
     except Exception:
         return None
-    return json.loads((DATA / name).read_text())
 
 
 MODEL = load_json("model.json")
@@ -269,7 +271,10 @@ def risk_level(p):
 RISK_COLOR = {"Low": GOOD, "Moderate": WARN, "High": ACCENT}
 
 
+LIVE = "Live forecast (next 16 days)"
+
 WEATHER_OPTIONS = [
+    LIVE,
     "Typical for that month",
     "Clear skies",
     "Light rain",
@@ -523,7 +528,29 @@ def render_checker():
         clim = clim.iloc[0].to_dict()
     else:
         clim = {"temp_c": 15.0, "precip_mm": 0.0, "snow_cm": 0.0, "gust_kmh": 25.0, "cloud_pct": 50.0}
-    wx = weather_values(weather_choice, clim)
+    forecast_note = None
+    if weather_choice == LIVE:
+        coords = q("SELECT latitude, longitude FROM airport_map WHERE origin = ?", [origin])
+        live = None
+        if len(coords) and pd.notna(coords.iloc[0]["latitude"]):
+            live = forecast_weather(
+                float(coords.iloc[0]["latitude"]), float(coords.iloc[0]["longitude"]),
+                travel_date.isoformat(), hour,
+            )
+        if live:
+            wx = live
+            forecast_note = (
+                f"Live Open-Meteo forecast for {origin} on {travel_date.strftime('%b %d')} "
+                f"at {hour_label(hour)}."
+            )
+        else:
+            wx = weather_values("Typical for that month", clim)
+            forecast_note = (
+                "No forecast available for that date, so this falls back to typical conditions for the month. "
+                "Forecasts only reach about 16 days out."
+            )
+    else:
+        wx = weather_values(weather_choice, clim)
 
     def build_rows(**overrides):
         base = {
@@ -545,6 +572,9 @@ def render_checker():
     """, [origin, dest, airline]).iloc[0]
 
     st.divider()
+
+    if forecast_note:
+        st.caption(forecast_note)
 
     # animated risk bar (scale tops out at 50%)
     fill = min(p / 0.5, 1.0) * 100
@@ -584,6 +614,7 @@ def render_checker():
     )
 
     WEATHER_PHRASE = {
+        LIVE: "the forecast conditions",
         "Typical for that month": "typical weather for the month",
         "Clear skies": "clear skies",
         "Light rain": "light rain",
@@ -680,6 +711,9 @@ def render_checker():
     **Weather used for this estimate:** {wx['temp_c']:.0f}°C, {wx['precip_mm']:.1f} mm/hr precipitation,
     {wx['snow_cm']:.1f} cm/hr snow, {wx['gust_kmh']:.0f} km/h gusts, {wx['cloud_pct']:.0f}% cloud cover.
     "Typical for that month" uses the average conditions at {origin} in {travel_date.strftime('%B')}.
+    "Live forecast" pulls the Open-Meteo forecast for your airport, date and hour. Worth noting that the model was
+    trained on observed historical weather, and a forecast is not an observation, so a prediction based on a
+    two-week-out forecast carries the forecast's own error on top of the model's.
 
     **Coverage:** departures from the {len(origin_list)} airports with weather data, on routes with at least
     {STATS['min_route_flights']} flights in the data. Cancelled flights are not included.
